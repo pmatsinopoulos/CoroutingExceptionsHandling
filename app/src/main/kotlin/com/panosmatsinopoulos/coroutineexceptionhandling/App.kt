@@ -12,22 +12,16 @@ fun log(message: String) {
 @OptIn(DelicateCoroutinesApi::class)
 fun main() {
     runBlocking {
-        try {
-            supervisorScope {
-                launch {
-                    try {
-                        log("The child is sleeping")
-                        delay(Long.MAX_VALUE)
-                    } finally {
-                        log("The child is cancelled")
-                    }
-                }
-                yield()
-                log("Throwing an exception from the scope")
+        val handler = CoroutineExceptionHandler { coroutineContext, throwable ->
+            log("CoroutineExceptionHandler got exception $throwable with coroutineContext $coroutineContext")
+        }
+        supervisorScope {
+            launch(handler) {
+                log("The child throws an exception")
                 throw AssertionError()
             }
-        } catch (e: AssertionError) {
-            log("Caught an assertion error")
+            log("The scope is completing")
         }
+        println("The scope is completed")
     }
 }
