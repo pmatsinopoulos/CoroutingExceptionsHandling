@@ -3,20 +3,33 @@
  */
 package com.panosmatsinopoulos.coroutineexceptionhandling
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 
 fun log(message: String) {
     println("[${Thread.currentThread().name}] $message")
 }
 
+@OptIn(DelicateCoroutinesApi::class)
 fun main() {
     runBlocking {
-        launch {
-            delay(1_000)
-            log("coroutineContext: $coroutineContext, ending coroutine")
+        val job = GlobalScope.launch {
+            log("launch in GlobalScope: $coroutineContext")
+            log("throwing exception from 'launch'")
+            throw IndexOutOfBoundsException()
         }
-        log("end of runBlocking code")
+        job.join()
+        log("joined failed job")
+
+        val deferred = GlobalScope.async {
+            log("async in GlobalScope: $coroutineContext")
+            log("throwing exception from async")
+            throw ArithmeticException()
+        }
+        try {
+            deferred.await()
+            // this point here is unreachable
+        } catch (e: ArithmeticException) {
+            log("Caught Arithmetic Exception")
+        }
     }
 }
