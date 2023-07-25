@@ -11,29 +11,23 @@ fun log(message: String) {
 
 @OptIn(DelicateCoroutinesApi::class)
 fun main() {
-    val supervisor = SupervisorJob()
     runBlocking {
-        with(CoroutineScope(coroutineContext + supervisor)) {
-            val firstChild = launch(CoroutineExceptionHandler { coroutineContext, throwable -> }) {
-                log("The first child is failing")
-                throw AssertionError("The first child is cancelled")
-            }
-            val secondChild = launch {
-                firstChild.join()
-                // cancellation of the first child is not propagated to the second child
-                log("The first child is cancelled: ${firstChild.isCancelled}, but the second one is still active")
-                try {
-                    delay(Long.MAX_VALUE)
-                } finally {
-                    // But cancellation of the supervisor is propagated
-                    log("The second child is cancelled because the supervisor was cancelled")
+        try {
+            supervisorScope {
+                launch {
+                    try {
+                        log("The child is sleeping")
+                        delay(Long.MAX_VALUE)
+                    } finally {
+                        log("The child is cancelled")
+                    }
                 }
+                yield()
+                log("Throwing an exception from the scope")
+                throw AssertionError()
             }
-            // wait until the first child fails & completes
-            firstChild.join()
-            log("Cancelling the supervisor")
-            supervisor.cancel()
-            secondChild.join()
+        } catch (e: AssertionError) {
+            log("Caught an assertion error")
         }
     }
 }
