@@ -11,20 +11,29 @@ fun log(message: String) {
 
 @OptIn(DelicateCoroutinesApi::class)
 fun main() {
+    val supervisor = SupervisorJob()
     runBlocking {
-        val handler = CoroutineExceptionHandler { coroutineContext, throwable ->
-            log("CoroutineExceptionHandler got exception: $throwable (coroutineContext is: $coroutineContext)")
+        with(CoroutineScope(coroutineContext + supervisor)) {
+            val firstChild = launch(CoroutineExceptionHandler { coroutineContext, throwable -> }) {
+                log("The first child is failing")
+                throw AssertionError("The first child is cancelled")
+            }
+            val secondChild = launch {
+                firstChild.join()
+                // cancellation of the first child is not propagated to the second child
+                log("The first child is cancelled: ${firstChild.isCancelled}, but the second one is still active")
+                try {
+                    delay(Long.MAX_VALUE)
+                } finally {
+                    // But cancellation of the supervisor is propagated
+                    log("The second child is cancelled because the supervisor was cancelled")
+                }
+            }
+            // wait until the first child fails & completes
+            firstChild.join()
+            log("Cancelling the supervisor")
+            supervisor.cancel()
+            secondChild.join()
         }
-        val job = GlobalScope.launch(handler) {
-            log("launch in GlobalScope: $coroutineContext")
-            log("throwing exception from 'launch'")
-            throw AssertionError()
-        }
-        val deferred = GlobalScope.async(handler) {
-            log("async in GlobalScope: $coroutineContext")
-            log("throwing exception from async")
-            throw ArithmeticException()
-        }
-        joinAll(job, deferred)
     }
 }
