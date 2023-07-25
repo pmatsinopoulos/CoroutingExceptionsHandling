@@ -12,24 +12,19 @@ fun log(message: String) {
 @OptIn(DelicateCoroutinesApi::class)
 fun main() {
     runBlocking {
-        val job = GlobalScope.launch {
+        val handler = CoroutineExceptionHandler { coroutineContext, throwable ->
+            log("CoroutineExceptionHandler got exception: $throwable (coroutineContext is: $coroutineContext)")
+        }
+        val job = GlobalScope.launch(handler) {
             log("launch in GlobalScope: $coroutineContext")
             log("throwing exception from 'launch'")
-            throw IndexOutOfBoundsException()
+            throw AssertionError()
         }
-        job.join()
-        log("joined failed job")
-
-        val deferred = GlobalScope.async {
+        val deferred = GlobalScope.async(handler) {
             log("async in GlobalScope: $coroutineContext")
             log("throwing exception from async")
             throw ArithmeticException()
         }
-        try {
-            deferred.await()
-            // this point here is unreachable
-        } catch (e: ArithmeticException) {
-            log("Caught Arithmetic Exception")
-        }
+        joinAll(job, deferred)
     }
 }
